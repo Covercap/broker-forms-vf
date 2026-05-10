@@ -29,6 +29,8 @@ import {
   LinkIcon,
   CheckCircle2,
   AlertCircle,
+  Mail,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { FormLanguage } from "@/lib/languages";
@@ -215,6 +217,10 @@ function TemplatesModule({
   const [hsContactId, setHsContactId] = useState<string | null>(null);
   const [hsCreating, setHsCreating] = useState(false);
   const [hsError, setHsError] = useState<string | null>(null);
+  // Email sending state
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
+  const [sendingEmail, setSendingEmail]          = useState(false);
+  const [emailSent, setEmailSent]                = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
@@ -270,6 +276,7 @@ function TemplatesModule({
     setHsDealName(null);
     setHsContactId(null);
     setHsError(null);
+    setEmailSent(false);
 
     /* Validate renewal deal ID */
     if (dealType === "renewal" && !renewalDealId.trim()) {
@@ -403,6 +410,54 @@ function TemplatesModule({
       } finally {
         setHsCreating(false);
       }
+    }
+  }
+
+  /* ── send form URL by email via SendGrid ── */
+  async function sendEmail() {
+    if (!formUrl || !contactEmail) return;
+    setSendingEmail(true);
+
+    const productLabel =
+      ((selectedTemplate?.product_code || "") +
+        " / " +
+        (selectedTemplate?.industry_code || "") +
+        " v" +
+        (selectedTemplate?.version || "")).trim();
+
+    try {
+      const res  = await fetch("/api/admin/send-form-email", {
+        method  : "POST",
+        headers : { "content-type": "application/json" },
+        body    : JSON.stringify({
+          adminSecret,
+          toEmail     : contactEmail,
+          lang,
+          dynamicData : {
+            contact_name : contactName || "",
+            company_name : company     || "",
+            product_name : productLabel,
+            form_url     : formUrl,
+          },
+        }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Falha ao enviar email");
+      }
+
+      setEmailSent(true);
+      setShowEmailConfirm(false);
+      toast({ title: "Email enviado com sucesso", description: `Email enviado para ${contactEmail}` });
+    } catch (e: any) {
+      toast({
+        title       : "Erro ao enviar email",
+        description : e?.message || String(e),
+        variant     : "destructive",
+      });
+    } finally {
+      setSendingEmail(false);
     }
   }
 
@@ -737,6 +792,25 @@ function TemplatesModule({
                     <ExternalLink className="h-4 w-4" />
                     Abrir Link
                   </Button>
+                  <Button
+                    onClick={() => {
+                      if (!contactEmail) {
+                        toast({
+                          title       : "Email do contato ausente",
+                          description : "Preencha o email do contato antes de enviar.",
+                          variant     : "destructive",
+                        });
+                        return;
+                      }
+                      setShowEmailConfirm(true);
+                    }}
+                    disabled={sendingEmail || emailSent}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {emailSent ? "Email Enviado ✓" : "Enviar por Email"}
+                  </Button>
                 </div>
 
                 {/* New Business: HubSpot status panel */}
@@ -824,6 +898,85 @@ function TemplatesModule({
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* ── Email confirmation overlay ── */}
+          {showEmailConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md">
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                  <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-blue-600" />
+                    Confirmar envio de email
+                  </h2>
+                  <button
+                    onClick={() => setShowEmailConfirm(false)}
+                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                    disabled={sendingEmail}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 space-y-3 text-sm text-slate-700">
+                  <div className="rounded-lg bg-slate-50 border border-slate-200 divide-y divide-slate-200">
+                    <div className="flex gap-3 px-4 py-3">
+                      <span className="w-20 shrink-0 font-medium text-slate-500">Para:</span>
+                      <span className="break-all">{contactEmail}</span>
+                    </div>
+                    <div className="flex gap-3 px-4 py-3">
+                      <span className="w-20 shrink-0 font-medium text-slate-500">Empresa:</span>
+                      <span>{company || "-"}</span>
+                    </div>
+                    <div className="flex gap-3 px-4 py-3">
+                      <span className="w-20 shrink-0 font-medium text-slate-500">Contato:</span>
+                      <span>{contactName || "-"}</span>
+                    </div>
+                    <div className="flex gap-3 px-4 py-3">
+                      <span className="w-20 shrink-0 font-medium text-slate-500">Produto:</span>
+                      <span>
+                        {((selectedTemplate?.product_code || "") +
+                          " / " +
+                          (selectedTemplate?.industry_code || "") +
+                          " v" +
+                          (selectedTemplate?.version || "")).trim() || "-"}
+                      </span>
+                    </div>
+                    <div className="flex gap-3 px-4 py-3">
+                      <span className="w-20 shrink-0 font-medium text-slate-500">Link:</span>
+                      <span className="break-all text-xs text-slate-500">{formUrl}</span>
+                    </div>
+                  </div>
+
+                  {!contactEmail && (
+                    <p className="text-red-600 text-xs">
+                      Preencha o email do contato para enviar.
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-3 p-5 border-t border-slate-100">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEmailConfirm(false)}
+                    disabled={sendingEmail}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={sendEmail}
+                    disabled={sendingEmail || !contactEmail}
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {sendingEmail ? "Enviando…" : "Enviar Email"}
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Error card */}
