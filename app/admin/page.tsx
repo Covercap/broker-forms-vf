@@ -203,7 +203,11 @@ function TemplatesModule({
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [lang, setLang] = useState<FormLanguage>("pt-BR");
-  const [ttl, setTtl] = useState(60 * 24 * 30);
+  const [expiringDate, setExpiringDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().split("T")[0]; // YYYY-MM-DD, default 30 days
+  });
   // Renewal: deal ID entered up front
   const [renewalDealId, setRenewalDealId] = useState("");
   // Post-generation state
@@ -235,6 +239,22 @@ function TemplatesModule({
   /* Derive product_code from selected template */
   const selectedTemplate = templates.find((t) => t.slug === selectedSlug);
   const productCode = selectedTemplate?.product_code || selectedSlug;
+
+  /* ── product name simplifier ── */
+  function simplifyProductName(productCode: string): string {
+    const parts  = (productCode || "").toLowerCase().split(/[_\s\-\/]+/);
+    const first  = parts[0] || "";
+    const second = parts[1] || "";
+    if (first === "dno")                          return "D&O";
+    if (first === "cyber" && second === "eo")     return "Cyber - E&O";
+    if (first === "cyber")                        return "Cyber";
+    if (first === "crime")                        return "Crime";
+    if (first === "rcg")                          return "RCG";
+    if (first === "rcp")                          return "E&O";
+    if (first === "fintech")                      return "Fintech";
+    if (first === "teo")                          return "Tech E&O";
+    return productCode; // fallback — shows raw code if unknown
+  }
 
   /* ── load templates ── */
   async function loadTemplates() {
@@ -288,12 +308,15 @@ function TemplatesModule({
     }
 
     /* 1. Create form instance in Supabase */
+    const ttlMinutes = Math.max(1, Math.round(
+      (new Date(expiringDate).getTime() - Date.now()) / 60000
+    ));
     const createBody: Record<string, any> = {
       adminSecret,
       templateSlug : selectedSlug,
       company,
       contact      : { name: contactName, email: contactEmail, phone: contactPhone },
-      ttlMinutes   : ttl,
+      ttlMinutes,
       dealType,
       website      : website.trim() || undefined,
     };
@@ -420,12 +443,9 @@ function TemplatesModule({
     if (!formUrl || !contactEmail) return;
     setSendingEmail(true);
 
-    const productLabel =
-      ((selectedTemplate?.product_code || "") +
-        " / " +
-        (selectedTemplate?.industry_code || "") +
-        " v" +
-        (selectedTemplate?.version || "")).trim();
+    const productName    = simplifyProductName(selectedTemplate?.product_code || selectedSlug);
+    const [y, m, d]      = expiringDate.split("-");
+    const formattedExpiry = `${d}/${m}/${y}`; // DD/MM/YYYY for the email
 
     try {
       const res  = await fetch("/api/admin/send-form-email", {
@@ -433,15 +453,18 @@ function TemplatesModule({
         headers : { "content-type": "application/json" },
         body    : JSON.stringify({
           adminSecret,
-          fromEmail   : senderEmail,
-          toEmail     : contactEmail,
-          dealId      : hsDealId || renewalDealId || undefined,
+          fromEmail    : senderEmail,
+          toEmail      : contactEmail,
+          dealId       : hsDealId || renewalDealId || undefined,
+          dealType,
           lang,
-          dynamicData : {
-            contact_name : contactName || "",
-            company_name : company     || "",
-            product_name : productLabel,
-            form_url     : formUrl,
+          productName,
+          dynamicData  : {
+            contact_name  : contactName || "",
+            company_name  : company     || "",
+            product_name  : productName,
+            form_url      : formUrl,
+            expiring_date : formattedExpiry,
           },
         }),
       });
@@ -454,6 +477,14 @@ function TemplatesModule({
       setEmailSent(true);
       setShowEmailConfirm(false);
       toast({ title: "Email enviado com sucesso", description: `Email enviado para ${contactEmail}` });
+
+      if (json.noteError) {
+        toast({
+          title       : "Nota HubSpot não criada",
+          description : json.noteError,
+          variant     : "destructive",
+        });
+      }
     } catch (e: any) {
       toast({
         title       : "Erro ao enviar email",
@@ -738,16 +769,16 @@ function TemplatesModule({
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="ttl" className="text-slate-700 font-medium">
-                        Validade (minutos)
+                      <Label htmlFor="expiring-date" className="text-slate-700 font-medium">
+                        Validade (data)
                       </Label>
                       <Input
-                        id="ttl"
-                        type="number"
-                        value={ttl}
-                        onChange={(e) => setTtl(Number(e.target.value || 0))}
+                        id="expiring-date"
+                        type="date"
+                        value={expiringDate}
+                        onChange={(e) => setExpiringDate(e.target.value)}
                         className="mt-2"
-                        min="1"
+                        min={new Date().toISOString().split("T")[0]}
                       />
                     </div>
                   </div>
