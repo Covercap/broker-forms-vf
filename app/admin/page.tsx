@@ -316,6 +316,9 @@ function TemplatesModule({
     if (dealType === "new_business" && json?.form_id) {
       setHsCreating(true);
       try {
+        // Construct the form URL so it can be stored as form_link in HubSpot
+        const generatedFormUrl = `${origin}/f/${json.form_id}?lang=${lang}&t=${json.token}`;
+
         const hsRes  = await fetch("/api/admin/hubspot/create-deal", {
           method  : "POST",
           headers : { "content-type": "application/json" },
@@ -327,6 +330,9 @@ function TemplatesModule({
             contactEmail,
             contactPhone,
             productCode,
+            formUrl      : generatedFormUrl, // stored in form_link deal property
+            lang,                             // 'pt-BR' → deal_country = Brazil
+            website,                          // included in the note
           }),
         });
         const hsJson = await hsRes.json();
