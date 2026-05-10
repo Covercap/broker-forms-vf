@@ -360,6 +360,50 @@ function TemplatesModule({
         setHsCreating(false);
       }
     }
+
+    /* 3. Renewal: update existing HubSpot deal with form_link + note */
+    if (dealType === "renewal" && json?.form_id && renewalDealId) {
+      setHsCreating(true);
+      try {
+        const generatedFormUrl = `${origin}/f/${json.form_id}?lang=${lang}&t=${json.token}`;
+
+        const hsRes  = await fetch("/api/admin/hubspot/update-deal", {
+          method  : "POST",
+          headers : { "content-type": "application/json" },
+          body    : JSON.stringify({
+            adminSecret,
+            formId       : json.form_id,
+            dealId       : renewalDealId,
+            formUrl      : generatedFormUrl,
+            company,
+            contactName,
+            contactEmail,
+            contactPhone,
+            website,
+          }),
+        });
+        const hsJson = await hsRes.json();
+
+        if (!hsRes.ok || !hsJson.ok) {
+          throw new Error(hsJson.error || "Falha ao atualizar negócio no HubSpot");
+        }
+
+        toast({
+          title       : "HubSpot atualizado",
+          description : `Link e nota adicionados ao Deal ${renewalDealId}.`,
+        });
+      } catch (e: any) {
+        const msg = e?.message || String(e);
+        setHsError(msg);
+        toast({
+          title       : "HubSpot: erro ao atualizar negócio",
+          description : msg + " — O link ainda é válido.",
+          variant     : "destructive",
+        });
+      } finally {
+        setHsCreating(false);
+      }
+    }
   }
 
   /* ── UI ── */
