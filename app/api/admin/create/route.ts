@@ -59,11 +59,12 @@ export async function POST(req: Request) {
       patch.hubspot_deal_id = String(hubspotDealId).replace(/\D/g, "");
     }
 
-    await supabaseAdmin
+    const { error: patchErr } = await supabaseAdmin
       .from("form_instances")
       .update(patch)
-      .eq("id", formId)
-      .catch((e: Error) => console.error("[admin/create] patch failed:", e));
+      .eq("id", formId);
+
+    if (patchErr) console.error("[admin/create] patch failed:", patchErr.message);
   }
 
   return NextResponse.json({ ok: true, ...data });
