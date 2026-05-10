@@ -27,6 +27,8 @@ import {
   Shield,
   Settings,
   LinkIcon,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { FormLanguage } from "@/lib/languages";
@@ -40,10 +42,10 @@ type Template = {
   status: string | null;
 };
 
+type DealType = "new_business" | "renewal";
 type Mode = "hub" | "templates" | "forms";
 
 export default function AdminPage() {
-  // === Autenticación simple para todo el panel ===
   const [adminSecret, setAdminSecret] = useState("");
   const [isAuthed, setIsAuthed] = useState(false);
   const [mode, setMode] = useState<Mode>("hub");
@@ -58,10 +60,7 @@ export default function AdminPage() {
   }, []);
 
   function handleLogin() {
-    if (!adminSecret) {
-      alert("Ingresa la contraseña");
-      return;
-    }
+    if (!adminSecret) { alert("Ingresa la contraseña"); return; }
     localStorage.setItem("adminSecret", adminSecret);
     setIsAuthed(true);
     setMode("hub");
@@ -74,58 +73,43 @@ export default function AdminPage() {
     setMode("hub");
   }
 
-  // === Pantalla de login (paso 1) ===
+  /* ── Login screen ── */
   if (!isAuthed) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="w-full bg-white shadow-sm border-b border-slate-200">
           <div className="container mx-auto px-4 py-6 max-w-4xl">
             <div className="flex justify-center">
-              <Image
-                src="/covercap-logo.png"
-                alt="CoverCap"
-                width={200}
-                height={80}
-                className="h-16 w-auto"
-              />
+              <Image src="/covercap-logo.png" alt="CoverCap" width={200} height={80} className="h-16 w-auto" />
             </div>
           </div>
         </div>
-
         <div className="container mx-auto px-4 py-8 max-w-xl">
           <Card className="bg-white/80 backdrop-blur-sm border-slate-200">
             <CardHeader className="bg-slate-50/50">
               <CardTitle className="flex items-center gap-2 text-slate-800">
                 <Shield className="h-5 w-5 text-teal-600" />
-                Autenticación
+                Autenticação
               </CardTitle>
-              <CardDescription>
-                Digita tu clave para entrar al panel administrativo
-              </CardDescription>
+              <CardDescription>Digite sua chave para entrar no painel administrativo</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
-                  <Label
-                    htmlFor="admin-secret"
-                    className="text-slate-700 font-medium"
-                  >
-                    Clave del Administrador
+                  <Label htmlFor="admin-secret" className="text-slate-700 font-medium">
+                    Chave do Administrador
                   </Label>
                   <Input
                     id="admin-secret"
                     type="password"
                     value={adminSecret}
                     onChange={(e) => setAdminSecret(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                     placeholder="Digite seu ADMIN_SECRET"
                     className="mt-2"
                   />
                 </div>
-                <Button
-                  onClick={handleLogin}
-                  disabled={!adminSecret}
-                  className="bg-[#FF5722] hover:bg-[#ff6e42] text-white"
-                >
+                <Button onClick={handleLogin} disabled={!adminSecret} className="bg-[#FF5722] hover:bg-[#ff6e42] text-white">
                   Entrar
                 </Button>
               </div>
@@ -136,37 +120,23 @@ export default function AdminPage() {
     );
   }
 
-  // === Hub con dos botones (paso 2) ===
+  /* ── Hub ── */
   if (mode === "hub") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="w-full bg-white shadow-sm border-b border-slate-200">
           <div className="container mx-auto px-4 py-6 max-w-4xl">
             <div className="flex justify-between items-center">
-              <Image
-                src="/covercap-logo.png"
-                alt="CoverCap"
-                width={160}
-                height={64}
-                className="h-12 w-auto"
-              />
-              <Button variant="outline" onClick={handleLogout}>
-                Salir
-              </Button>
+              <Image src="/covercap-logo.png" alt="CoverCap" width={160} height={64} className="h-12 w-auto" />
+              <Button variant="outline" onClick={handleLogout}>Sair</Button>
             </div>
           </div>
         </div>
-
         <div className="container mx-auto px-4 py-8 max-w-4xl space-y-6">
           <div className="text-center mb-2">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">
-              Panel Administrativo
-            </h1>
-            <p className="text-slate-600">
-              Selecciona un módulo para continuar
-            </p>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">Painel Administrativo</h1>
+            <p className="text-slate-600">Selecione um módulo para continuar</p>
           </div>
-
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="bg-white/80 backdrop-blur-sm border-slate-200">
               <CardHeader className="bg-slate-50/50">
@@ -174,26 +144,19 @@ export default function AdminPage() {
                   <Settings className="h-5 w-5 text-blue-600" />
                   Templates
                 </CardTitle>
-                <CardDescription>
-                  Cargar templates y generar links de formularios.
-                </CardDescription>
+                <CardDescription>Gerar links de formulários e gerenciar negócios no HubSpot.</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <Button onClick={() => setMode("templates")}>
-                  Ir a Templates
-                </Button>
+                <Button onClick={() => setMode("templates")}>Ir a Templates</Button>
               </CardContent>
             </Card>
-
             <Card className="bg-white/80 backdrop-blur-sm border-slate-200">
               <CardHeader className="bg-slate-50/50">
                 <CardTitle className="flex items-center gap-2 text-slate-800">
                   <LinkIcon className="h-5 w-5 text-orange-600" />
-                  Forms (seguimiento)
+                  Forms (seguimento)
                 </CardTitle>
-                <CardDescription>
-                  Ver estado de formularios y descargar PDF/ZIP.
-                </CardDescription>
+                <CardDescription>Ver estado dos formulários e baixar PDF/ZIP.</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <Button onClick={() => setMode("forms")}>Ir a Forms</Button>
@@ -205,34 +168,20 @@ export default function AdminPage() {
     );
   }
 
-  // === Módulo Templates (TU UI ORIGINAL, SIN CAMBIAR LA LÓGICA) ===
   if (mode === "templates") {
-    return (
-      <TemplatesModule
-        adminSecretFromHub={adminSecret}
-        onBack={() => setMode("hub")}
-        onLogout={handleLogout}
-      />
-    );
+    return <TemplatesModule adminSecretFromHub={adminSecret} onBack={() => setMode("hub")} onLogout={handleLogout} />;
   }
 
-  // === Módulo Forms (nuevo) ===
   if (mode === "forms") {
-    return (
-      <FormsModule
-        adminSecret={adminSecret}
-        onBack={() => setMode("hub")}
-        onLogout={handleLogout}
-      />
-    );
+    return <FormsModule adminSecret={adminSecret} onBack={() => setMode("hub")} onLogout={handleLogout} />;
   }
 
   return null;
 }
 
-/* ===========================
-   TEMPLATES MODULE (TU CÓDIGO)
-   =========================== */
+/* ================================================================
+   TEMPLATES MODULE
+   ================================================================ */
 function TemplatesModule({
   adminSecretFromHub,
   onBack,
@@ -242,203 +191,182 @@ function TemplatesModule({
   onBack: () => void;
   onLogout: () => void;
 }) {
-  // --- Copia fiel de tu estado y lógica (solo movido a este componente) ---
   const [adminSecret, setAdminSecret] = useState(adminSecretFromHub || "");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedSlug, setSelectedSlug] = useState("");
   const [company, setCompany] = useState("");
+  const [website, setWebsite] = useState("");
+  const [dealType, setDealType] = useState<DealType>("new_business");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [lang, setLang] = useState<FormLanguage>("pt-BR");
   const [ttl, setTtl] = useState(60 * 24 * 30);
+  // Renewal: deal ID entered up front
+  const [renewalDealId, setRenewalDealId] = useState("");
+  // Post-generation state
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    form_id?: string;
-    token?: string;
-  } | null>(null);
+  const [result, setResult] = useState<{ form_id?: string; token?: string } | null>(null);
+  const [generatedToken, setGeneratedToken] = useState("");
+  // New Business: HubSpot deal creation result
+  const [hsDealId, setHsDealId] = useState<string | null>(null);
+  const [hsDealName, setHsDealName] = useState<string | null>(null);
+  const [hsContactId, setHsContactId] = useState<string | null>(null);
+  const [hsCreating, setHsCreating] = useState(false);
+  const [hsError, setHsError] = useState<string | null>(null);
+
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
-  const [generatedToken, setGeneratedToken] = useState<string>("");
-  const [hubspotDealId, setHubspotDealId] = useState<string>("");
-  const [savingDeal, setSavingDeal] = useState<boolean>(false);
+  const origin  = typeof window !== "undefined" ? window.location.origin : "";
+  const formUrl = result?.form_id && result?.token
+    ? `${origin}/f/${result.form_id}?lang=${lang}&t=${result.token}`
+    : "";
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const formUrl =
-    result?.form_id && result?.token
-      ? `${origin}/f/${result.form_id}?lang=${lang}&t=${result.token}`
-      : "";
+  /* Derive product_code from selected template */
+  const selectedTemplate = templates.find((t) => t.slug === selectedSlug);
+  const productCode = selectedTemplate?.product_code || selectedSlug;
 
-  function extractTokenFromUrl(url: string): string {
-    try {
-      const u = new URL(url);
-      return u.searchParams.get("t") || "";
-    } catch {
-      return "";
-    }
-  }
-
+  /* ── load templates ── */
   async function loadTemplates() {
     setError(null);
     setTemplates([]);
     setSelectedSlug("");
-
-    const res = await fetch("/api/admin/templates", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ adminSecret }),
+    const res  = await fetch("/api/admin/templates", {
+      method  : "POST",
+      headers : { "content-type": "application/json" },
+      body    : JSON.stringify({ adminSecret }),
     });
-
     const json = await res.json();
     if (!res.ok) {
       setError(json.error || "Erro ao listar templates");
-      toast({
-        title: "Erro",
-        description: json.error || "Erro ao listar templates",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: json.error || "Erro ao listar templates", variant: "destructive" });
       return;
     }
     setTemplates(json.templates || []);
     if (json.templates?.length) setSelectedSlug(json.templates[0].slug);
-
-    toast({
-      title: "Sucesso",
-      description: `${json.templates?.length || 0} templates carregados`,
-    });
+    toast({ title: "Sucesso", description: `${json.templates?.length || 0} templates carregados` });
   }
 
+  /* ── copy URL ── */
+  async function copyUrl() {
+    if (!formUrl) return;
+    try {
+      await navigator.clipboard.writeText(formUrl);
+      toast({ title: "URL copiada", description: "A URL foi copiada para a área de transferência" });
+    } catch {
+      toast({ title: "Erro ao copiar", description: "Copie manualmente a URL", variant: "destructive" });
+    }
+  }
+
+  /* ── create link (+ conditional HubSpot for new_business) ── */
   async function createLink() {
     setCreating(true);
     setError(null);
     setResult(null);
     setGeneratedToken("");
-    setHubspotDealId("");
+    setHsDealId(null);
+    setHsDealName(null);
+    setHsContactId(null);
+    setHsError(null);
 
-    const res = await fetch("/api/admin/create", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        adminSecret,
-        templateSlug: selectedSlug,
-        company,
-        contact: { name: contactName, email: contactEmail, phone: contactPhone },
-        ttlMinutes: ttl,
-      }),
+    /* Validate renewal deal ID */
+    if (dealType === "renewal" && !renewalDealId.trim()) {
+      setError("Para Renovação, informe o HubSpot Deal ID antes de gerar o link.");
+      setCreating(false);
+      return;
+    }
+
+    /* 1. Create form instance in Supabase */
+    const createBody: Record<string, any> = {
+      adminSecret,
+      templateSlug : selectedSlug,
+      company,
+      contact      : { name: contactName, email: contactEmail, phone: contactPhone },
+      ttlMinutes   : ttl,
+      dealType,
+      website      : website.trim() || undefined,
+    };
+    if (dealType === "renewal" && renewalDealId) {
+      createBody.hubspotDealId = renewalDealId.replace(/\D/g, "");
+    }
+
+    const res  = await fetch("/api/admin/create", {
+      method  : "POST",
+      headers : { "content-type": "application/json" },
+      body    : JSON.stringify(createBody),
     });
-
     const json = await res.json();
     setCreating(false);
+
     if (!res.ok) {
       setError(json.error || "Erro ao criar link");
-      toast({
-        title: "Erro",
-        description: json.error || "Erro ao criar link",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: json.error || "Erro ao criar link", variant: "destructive" });
       return;
     }
 
     setResult(json);
+    const token = json?.token || "";
+    setGeneratedToken(token);
 
-    const tokenFromResponse = json?.token || "";
-    const tokenFromUrl =
-      tokenFromResponse ||
-      extractTokenFromUrl(
-        `${origin}/f/${json?.form_id}?lang=${lang}&t=${json?.token}`,
-      );
-    setGeneratedToken(tokenFromUrl);
+    toast({ title: "Link criado com sucesso", description: "O link seguro foi gerado e está pronto para uso" });
 
-    toast({
-      title: "Link criado com sucesso",
-      description: "O link seguro foi gerado e está pronto para uso",
-    });
-  }
+    /* 2. New Business: auto-create HubSpot deal + contact */
+    if (dealType === "new_business" && json?.form_id) {
+      setHsCreating(true);
+      try {
+        const hsRes  = await fetch("/api/admin/hubspot/create-deal", {
+          method  : "POST",
+          headers : { "content-type": "application/json" },
+          body    : JSON.stringify({
+            adminSecret,
+            formId       : json.form_id,
+            company,
+            contactName,
+            contactEmail,
+            contactPhone,
+            productCode,
+          }),
+        });
+        const hsJson = await hsRes.json();
 
-  async function copyUrl() {
-    if (!formUrl) return;
-    try {
-      await navigator.clipboard.writeText(formUrl);
-      toast({
-        title: "URL copiada",
-        description: "A URL foi copiada para a área de transferência",
-      });
-    } catch {
-      toast({
-        title: "Erro ao copiar",
-        description: "Copie manualmente a URL",
-        variant: "destructive",
-      });
-    }
-  }
+        if (!hsRes.ok || !hsJson.ok) {
+          throw new Error(hsJson.error || "Falha ao criar negócio no HubSpot");
+        }
 
-  async function saveHubspotDeal() {
-    if (!generatedToken) {
-      return toast({
-        title: "Gere o link primeiro",
-        description: "Precisamos do token do link para salvar o Deal ID.",
-        variant: "destructive",
-      });
-    }
-    if (!hubspotDealId || !/^\d+$/.test(hubspotDealId)) {
-      return toast({
-        title: "Deal ID inválido",
-        description: "Cole apenas números (ex.: 41368145976).",
-        variant: "destructive",
-      });
-    }
-
-    try {
-      setSavingDeal(true);
-      const res = await fetch("/api/admin/set-hubspot-deal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: generatedToken,
-          hubspot_deal_id: hubspotDealId,
-        }),
-      });
-      const j = await res.json();
-      if (!res.ok || !j.ok) {
-        throw new Error(j.error || "Falha ao salvar Deal ID");
+        setHsDealId(hsJson.dealId);
+        setHsDealName(hsJson.dealName);
+        setHsContactId(hsJson.contactId);
+        toast({
+          title       : "Negócio criado no HubSpot",
+          description : `Deal ID: ${hsJson.dealId} — "${hsJson.dealName}"`,
+        });
+      } catch (e: any) {
+        const msg = e?.message || String(e);
+        setHsError(msg);
+        toast({
+          title       : "HubSpot: erro ao criar negócio",
+          description : msg + " — O link ainda é válido. Adicione o Deal ID manualmente se necessário.",
+          variant     : "destructive",
+        });
+      } finally {
+        setHsCreating(false);
       }
-      toast({
-        title: "Deal ID salvo",
-        description: "O formulário foi vinculado ao negócio do HubSpot.",
-      });
-    } catch (e: any) {
-      toast({
-        title: "Erro ao salvar Deal ID",
-        description: e?.message || String(e),
-        variant: "destructive",
-      });
-    } finally {
-      setSavingDeal(false);
     }
   }
 
-  // === UI de Templates (tu diseño original) ===
+  /* ── UI ── */
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header */}
       <div className="w-full bg-white shadow-sm border-b border-slate-200">
         <div className="container mx-auto px-4 py-6 max-w-4xl">
           <div className="flex justify-between items-center">
-            <Image
-              src="/covercap-logo.png"
-              alt="CoverCap"
-              width={160}
-              height={64}
-              className="h-12 w-auto"
-            />
+            <Image src="/covercap-logo.png" alt="CoverCap" width={160} height={64} className="h-12 w-auto" />
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={onBack}>
-                ← Volver
-              </Button>
-              <Button variant="outline" onClick={onLogout}>
-                Salir
-              </Button>
+              <Button variant="secondary" onClick={onBack}>← Voltar</Button>
+              <Button variant="outline" onClick={onLogout}>Sair</Button>
             </div>
           </div>
         </div>
@@ -446,33 +374,24 @@ function TemplatesModule({
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">
-            Painel Administrativo
-          </h1>
-          <p className="text-slate-600">
-            Geração de links seguros para questionários de seguros
-          </p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Painel Administrativo</h1>
+          <p className="text-slate-600">Geração de links seguros para questionários de seguros</p>
         </div>
 
         <div className="space-y-6">
-          {/* Autenticación propia del módulo */}
+          {/* ── Auth card ── */}
           <Card className="bg-white/80 backdrop-blur-sm border-slate-200">
             <CardHeader className="bg-slate-50/50">
               <CardTitle className="flex items-center gap-2 text-slate-800">
                 <Shield className="h-5 w-5 text-teal-600" />
-                Autenticação (Templates)
+                Autenticação
               </CardTitle>
-              <CardDescription>
-                Digite sua chave secreta para acessar os templates
-              </CardDescription>
+              <CardDescription>Digite sua chave secreta para acessar os templates</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="flex gap-4 items-end">
                 <div className="flex-1">
-                  <Label
-                    htmlFor="admin-secret"
-                    className="text-slate-700 font-medium"
-                  >
+                  <Label htmlFor="admin-secret" className="text-slate-700 font-medium">
                     Chave Secreta do Administrador
                   </Label>
                   <div className="relative mt-2">
@@ -491,11 +410,9 @@ function TemplatesModule({
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-slate-500" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-slate-500" />
-                      )}
+                      {showPassword
+                        ? <EyeOff className="h-4 w-4 text-slate-500" />
+                        : <Eye  className="h-4 w-4 text-slate-500" />}
                     </Button>
                   </div>
                 </div>
@@ -510,6 +427,7 @@ function TemplatesModule({
             </CardContent>
           </Card>
 
+          {/* ── Config card (shown after templates load) ── */}
           {templates.length > 0 && (
             <>
               <Card className="bg-blue-50/50 backdrop-blur-sm border-blue-200">
@@ -523,17 +441,13 @@ function TemplatesModule({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
+
+                  {/* Template select */}
                   <div>
-                    <Label
-                      htmlFor="template-select"
-                      className="text-slate-700 font-medium"
-                    >
+                    <Label htmlFor="template-select" className="text-slate-700 font-medium">
                       Produto / Template
                     </Label>
-                    <Select
-                      value={selectedSlug}
-                      onValueChange={setSelectedSlug}
-                    >
+                    <Select value={selectedSlug} onValueChange={setSelectedSlug}>
                       <SelectTrigger className="mt-2">
                         <SelectValue placeholder="Selecione um template" />
                       </SelectTrigger>
@@ -553,11 +467,59 @@ function TemplatesModule({
                     </Select>
                   </div>
 
+                  {/* Deal type */}
                   <div>
-                    <Label
-                      htmlFor="company"
-                      className="text-slate-700 font-medium"
+                    <Label htmlFor="deal-type" className="text-slate-700 font-medium">
+                      Tipo de Negócio
+                    </Label>
+                    <Select
+                      value={dealType}
+                      onValueChange={(v) => {
+                        setDealType(v as DealType);
+                        setRenewalDealId("");
+                      }}
                     >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new_business">Novo Negócio (New Business)</SelectItem>
+                        <SelectItem value="renewal">Renovação (Renewal)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {dealType === "new_business"
+                        ? "Um novo negócio e contato serão criados automaticamente no HubSpot."
+                        : "Informe o Deal ID existente no HubSpot para vincular esta renovação."}
+                    </p>
+                  </div>
+
+                  {/* Renewal: HubSpot Deal ID (required before generation) */}
+                  {dealType === "renewal" && (
+                    <div>
+                      <Label htmlFor="renewal-deal-id" className="text-slate-700 font-medium">
+                        HubSpot Deal ID{" "}
+                        <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="renewal-deal-id"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="\d*"
+                        placeholder="Ex.: 41368145976"
+                        value={renewalDealId}
+                        onChange={(e) => setRenewalDealId(e.target.value.replace(/\D/g, ""))}
+                        className="mt-2"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Cole o ID numérico do negócio existente no HubSpot. O formulário será vinculado a este negócio ao ser submetido.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Company name */}
+                  <div>
+                    <Label htmlFor="company" className="text-slate-700 font-medium">
                       Nome da Empresa
                     </Label>
                     <Input
@@ -569,18 +531,29 @@ function TemplatesModule({
                     />
                   </div>
 
+                  {/* Website */}
+                  <div>
+                    <Label htmlFor="website" className="text-slate-700 font-medium">
+                      Website da Empresa
+                    </Label>
+                    <Input
+                      id="website"
+                      type="url"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      placeholder="https://empresa.com.br"
+                      className="mt-2"
+                    />
+                  </div>
+
+                  {/* Contact info */}
                   <div>
                     <Label className="text-slate-700 font-medium mb-3 block">
                       Informações de Contato
                     </Label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label
-                          htmlFor="contact-name"
-                          className="text-sm text-slate-600"
-                        >
-                          Nome do Contato
-                        </Label>
+                        <Label htmlFor="contact-name" className="text-sm text-slate-600">Nome do Contato</Label>
                         <Input
                           id="contact-name"
                           value={contactName}
@@ -590,12 +563,7 @@ function TemplatesModule({
                         />
                       </div>
                       <div>
-                        <Label
-                          htmlFor="contact-email"
-                          className="text-sm text-slate-600"
-                        >
-                          Email
-                        </Label>
+                        <Label htmlFor="contact-email" className="text-sm text-slate-600">Email</Label>
                         <Input
                           id="contact-email"
                           type="email"
@@ -606,12 +574,7 @@ function TemplatesModule({
                         />
                       </div>
                       <div>
-                        <Label
-                          htmlFor="contact-phone"
-                          className="text-sm text-slate-600"
-                        >
-                          Telefone
-                        </Label>
+                        <Label htmlFor="contact-phone" className="text-sm text-slate-600">Telefone</Label>
                         <Input
                           id="contact-phone"
                           value={contactPhone}
@@ -623,47 +586,30 @@ function TemplatesModule({
                     </div>
                   </div>
 
+                  {/* Language + TTL */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label
-                        htmlFor="language"
-                        className="text-slate-700 font-medium"
-                      >
+                      <Label htmlFor="language" className="text-slate-700 font-medium">
                         Idioma do Questionário
                       </Label>
-                      <Select
-                        value={lang}
-                        onValueChange={(value) =>
-                          setLang(value as FormLanguage)
-                        }
-                      >
-                        <SelectTrigger className="mt-2">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select value={lang} onValueChange={(v) => setLang(v as FormLanguage)}>
+                        <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pt-BR">
-                            Português (Brasil)
-                          </SelectItem>
+                          <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
                           <SelectItem value="es">Español</SelectItem>
                           <SelectItem value="en">English</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-
                     <div>
-                      <Label
-                        htmlFor="ttl"
-                        className="text-slate-700 font-medium"
-                      >
+                      <Label htmlFor="ttl" className="text-slate-700 font-medium">
                         Validade (minutos)
                       </Label>
                       <Input
                         id="ttl"
                         type="number"
                         value={ttl}
-                        onChange={(e) =>
-                          setTtl(Number(e.target.value || 0))
-                        }
+                        onChange={(e) => setTtl(Number(e.target.value || 0))}
                         className="mt-2"
                         min="1"
                       />
@@ -672,6 +618,7 @@ function TemplatesModule({
                 </CardContent>
               </Card>
 
+              {/* Generate button card */}
               <Card className="bg-white/80 backdrop-blur-sm border-slate-200">
                 <CardHeader className="bg-slate-50/50">
                   <CardTitle className="flex items-center gap-2 text-slate-800">
@@ -679,25 +626,37 @@ function TemplatesModule({
                     Geração do Link Seguro
                   </CardTitle>
                   <CardDescription>
-                    Crie um link seguro e temporário para o questionário
+                    {dealType === "new_business"
+                      ? "Cria o link e abre automaticamente um novo negócio no HubSpot."
+                      : "Cria o link e vincula ao negócio de renovação informado."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <Button
                     onClick={createLink}
                     disabled={
-                      !selectedSlug || !company || !adminSecret || creating
+                      !selectedSlug ||
+                      !company ||
+                      !adminSecret ||
+                      creating ||
+                      hsCreating ||
+                      (dealType === "renewal" && !renewalDealId)
                     }
                     className="bg-orange-600 hover:bg-orange-700 text-white w-full md:w-auto"
                     size="lg"
                   >
-                    {creating ? "Gerando Link..." : "Gerar Link Seguro"}
+                    {creating
+                      ? "Gerando Link..."
+                      : hsCreating
+                      ? "Criando Negócio no HubSpot..."
+                      : "Gerar Link Seguro"}
                   </Button>
                 </CardContent>
               </Card>
             </>
           )}
 
+          {/* ── Result card ── */}
           {formUrl && (
             <Card className="bg-green-50/50 backdrop-blur-sm border-green-200">
               <CardHeader className="bg-green-100/50">
@@ -705,86 +664,124 @@ function TemplatesModule({
                   <LinkIcon className="h-5 w-5 text-green-600" />
                   Link Gerado com Sucesso
                 </CardTitle>
-                <CardDescription>
-                  Compartilhe este link seguro com o cliente
-                </CardDescription>
+                <CardDescription>Compartilhe este link seguro com o cliente</CardDescription>
               </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-6">
-                  <div className="p-4 bg-white rounded-lg border border-green-200">
-                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      URL do Questionário
-                    </Label>
-                    <div className="font-mono text-sm text-slate-600 break-all bg-slate-50 p-3 rounded border">
-                      {formUrl}
-                    </div>
-                  </div>
+              <CardContent className="pt-6 space-y-6">
 
-                  <div className="flex flex-col md:flex-row gap-3">
-                    <Button
-                      onClick={copyUrl}
-                      variant="outline"
-                      className="flex items-center gap-2 bg-transparent"
-                    >
-                      <Copy className="h-4 w-4" />
-                      Copiar URL
-                    </Button>
-                    <Button
-                      onClick={() => window.open(formUrl, "_blank")}
-                      variant="outline"
-                      className="flex items-center gap-2"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Abrir Link
-                    </Button>
-                  </div>
-
-                  <div className="rounded-lg border border-green-200 bg-white p-4">
-                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      HubSpot Deal ID (opcional)
-                    </Label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="\d*"
-                        placeholder="Cole o número do negócio (ex.: 41368145976)"
-                        value={hubspotDealId}
-                        onChange={(e) => {
-                          const onlyDigits = e.target.value.replace(/\D/g, "");
-                          setHubspotDealId(onlyDigits);
-                        }}
-                        className="md:col-span-2"
-                      />
-                      <Button
-                        type="button"
-                        onClick={saveHubspotDeal}
-                        disabled={
-                          !generatedToken || !hubspotDealId || savingDeal
-                        }
-                        className="bg-orange-600 hover:bg-orange-700 text-white"
-                      >
-                        {savingDeal ? "Salvando..." : "Salvar Deal ID"}
-                      </Button>
-                    </div>
-
-                    {!generatedToken && (
-                      <p className="text-xs text-amber-600 mt-2">
-                        Gere o link primeiro para capturar o token e permitir o
-                        salvamento do Deal ID.
-                      </p>
-                    )}
+                {/* URL display */}
+                <div className="p-4 bg-white rounded-lg border border-green-200">
+                  <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                    URL do Questionário
+                  </Label>
+                  <div className="font-mono text-sm text-slate-600 break-all bg-slate-50 p-3 rounded border">
+                    {formUrl}
                   </div>
                 </div>
+
+                <div className="flex flex-col md:flex-row gap-3">
+                  <Button onClick={copyUrl} variant="outline" className="flex items-center gap-2 bg-transparent">
+                    <Copy className="h-4 w-4" />
+                    Copiar URL
+                  </Button>
+                  <Button onClick={() => window.open(formUrl, "_blank")} variant="outline" className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir Link
+                  </Button>
+                </div>
+
+                {/* New Business: HubSpot status panel */}
+                {dealType === "new_business" && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-4 space-y-2">
+                    <p className="text-sm font-semibold text-blue-800">HubSpot — Novo Negócio</p>
+
+                    {hsCreating && (
+                      <p className="text-sm text-blue-700 animate-pulse">
+                        Criando negócio e contato no HubSpot…
+                      </p>
+                    )}
+
+                    {hsDealId && !hsCreating && (
+                      <div className="space-y-1 text-sm text-blue-900">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                          <span>
+                            <strong>Deal criado:</strong>{" "}
+                            <a
+                              href={`https://app.hubspot.com/contacts/deals/${hsDealId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline"
+                            >
+                              {hsDealId}
+                            </a>{" "}
+                            — {hsDealName}
+                          </span>
+                        </div>
+                        {hsContactId && (
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                            <span>
+                              <strong>Contato criado:</strong>{" "}
+                              <a
+                                href={`https://app.hubspot.com/contacts/${hsContactId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline"
+                              >
+                                {hsContactId}
+                              </a>
+                            </span>
+                          </div>
+                        )}
+                        <p className="text-xs text-blue-700 mt-1">
+                          Ao submeter o formulário, o negócio será movido automaticamente para a etapa <strong>Qualificação</strong>.
+                        </p>
+                      </div>
+                    )}
+
+                    {hsError && !hsCreating && (
+                      <div className="flex items-start gap-2 text-sm text-red-700">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <span>
+                          Erro HubSpot: {hsError}. O link é válido, mas você precisará adicionar o Deal ID manualmente abaixo se necessário.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Renewal: confirmation of linked deal */}
+                {dealType === "renewal" && renewalDealId && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center gap-2 text-sm text-slate-700">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                      <span>
+                        Formulário vinculado ao Deal ID{" "}
+                        <strong>
+                          <a
+                            href={`https://app.hubspot.com/contacts/deals/${renewalDealId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            {renewalDealId}
+                          </a>
+                        </strong>{" "}
+                        no HubSpot. Ao submeter, o negócio avançará para <strong>Waiting for Proposal</strong>.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
+          {/* Error card */}
           {error && (
             <Card className="bg-red-50/50 backdrop-blur-sm border-red-200">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-red-700">
-                  <div className="h-2 w-2 bg-red-500 rounded-full"></div>
+                  <div className="h-2 w-2 bg-red-500 rounded-full" />
                   <span className="font-medium">Erro:</span>
                   <span>{error}</span>
                 </div>
@@ -797,9 +794,9 @@ function TemplatesModule({
   );
 }
 
-/* =======================
-   FORMS MODULE (NUEVO)
-   ======================= */
+/* ================================================================
+   FORMS MODULE
+   ================================================================ */
 function FormsModule({
   adminSecret,
   onBack,
@@ -809,43 +806,34 @@ function FormsModule({
   onBack: () => void;
   onLogout: () => void;
 }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows]     = useState<any[]>([]);
   const [status, setStatus] = useState<string>("");
-  const [q, setQ] = useState<string>("");
+  const [q, setQ]           = useState<string>("");
 
   async function load(page = 1) {
-    const res = await fetch(`/api/formsadmin/list`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adminSecret, status, q, page, pageSize: 20 }),
+    const res = await fetch("/api/formsadmin/list", {
+      method  : "POST",
+      headers : { "Content-Type": "application/json" },
+      body    : JSON.stringify({ adminSecret, status, q, page, pageSize: 20 }),
     });
-    if (!res.ok) {
-      alert("No autorizado o error cargando los formularios");
-      return;
-    }
+    if (!res.ok) { alert("Não autorizado ou erro ao carregar os formulários"); return; }
     const json = await res.json();
     setRows(json.data || []);
   }
 
-  useEffect(() => {
-    load(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  useEffect(() => { load(1); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [status]);
 
   async function downloadPdf(formId: string) {
     const res = await fetch(`/api/formsadmin/pdf/${formId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adminSecret }),
+      method  : "POST",
+      headers : { "Content-Type": "application/json" },
+      body    : JSON.stringify({ adminSecret }),
     });
-    if (!res.ok) {
-      alert("Error generando PDF");
-      return;
-    }
+    if (!res.ok) { alert("Erro ao gerar PDF"); return; }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
     a.download = `form_${formId}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
@@ -853,18 +841,15 @@ function FormsModule({
 
   async function downloadZip(formId: string) {
     const res = await fetch(`/api/formsadmin/zip/${formId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adminSecret }),
+      method  : "POST",
+      headers : { "Content-Type": "application/json" },
+      body    : JSON.stringify({ adminSecret }),
     });
-    if (!res.ok) {
-      alert("Error generando ZIP");
-      return;
-    }
+    if (!res.ok) { alert("Erro ao gerar ZIP"); return; }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
     a.download = `form_${formId}_attachments.zip`;
     a.click();
     URL.revokeObjectURL(url);
@@ -875,20 +860,10 @@ function FormsModule({
       <div className="w-full bg-white shadow-sm border-b border-slate-200">
         <div className="container mx-auto px-4 py-6 max-w-4xl">
           <div className="flex justify-between items-center">
-            <Image
-              src="/covercap-logo.png"
-              alt="CoverCap"
-              width={160}
-              height={64}
-              className="h-12 w-auto"
-            />
+            <Image src="/covercap-logo.png" alt="CoverCap" width={160} height={64} className="h-12 w-auto" />
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={onBack}>
-                ← Volver
-              </Button>
-              <Button variant="outline" onClick={onLogout}>
-                Salir
-              </Button>
+              <Button variant="secondary" onClick={onBack}>← Voltar</Button>
+              <Button variant="outline" onClick={onLogout}>Sair</Button>
             </div>
           </div>
         </div>
@@ -896,11 +871,7 @@ function FormsModule({
 
       <div className="container mx-auto px-4 py-8 max-w-4xl space-y-4">
         <div className="flex gap-2">
-          <Input
-            placeholder="Buscar empresa..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+          <Input placeholder="Buscar empresa..." value={q} onChange={(e) => setQ(e.target.value)} />
           <Button onClick={() => load(1)}>Buscar</Button>
         </div>
 
@@ -908,44 +879,30 @@ function FormsModule({
           <thead className="bg-muted">
             <tr>
               <th className="p-2 text-left">Empresa</th>
+              <th className="p-2">Tipo</th>
               <th className="p-2">Status</th>
               <th className="p-2">Respondidas</th>
               <th className="p-2">Anexos</th>
-              <th className="p-2">Creado</th>
+              <th className="p-2">Criado</th>
               <th className="p-2">Vence</th>
-              <th className="p-2">Acciones</th>
+              <th className="p-2">Ações</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.form_id} className="border-t">
                 <td className="p-2">{r.respondent_company ?? "-"}</td>
+                <td className="p-2 text-xs text-slate-500">
+                  {r.deal_type === "new_business" ? "Novo" : "Renovação"}
+                </td>
                 <td className="p-2">{r.computed_status}</td>
-                <td className="p-2">
-                  {r.answered_questions}/{r.required_questions}
-                </td>
+                <td className="p-2">{r.answered_questions}/{r.required_questions}</td>
                 <td className="p-2">{r.attachments_count}</td>
-                <td className="p-2">
-                  {new Date(r.created_at).toLocaleDateString()}
-                </td>
-                <td className="p-2">
-                  {r.due_at
-                    ? new Date(r.due_at).toLocaleDateString()
-                    : "-"}
-                </td>
+                <td className="p-2">{new Date(r.created_at).toLocaleDateString()}</td>
+                <td className="p-2">{r.due_at ? new Date(r.due_at).toLocaleDateString() : "-"}</td>
                 <td className="p-2 space-x-2">
-                  <button
-                    className="underline"
-                    onClick={() => downloadPdf(r.form_id)}
-                  >
-                    Descargar PDF
-                  </button>
-                  <button
-                    className="underline"
-                    onClick={() => downloadZip(r.form_id)}
-                  >
-                    Descargar ZIP
-                  </button>
+                  <button className="underline" onClick={() => downloadPdf(r.form_id)}>PDF</button>
+                  <button className="underline" onClick={() => downloadZip(r.form_id)}>ZIP</button>
                 </td>
               </tr>
             ))}

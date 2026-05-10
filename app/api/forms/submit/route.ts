@@ -1,11 +1,37 @@
-export const runtime = 'nodejs';
+// app/api/forms/submit/route.ts
+//
+// Called non-blocking after the respondent submits the form.
+// Moves the HubSpot deal to the appropriate stage based on deal_type:
+//
+//   deal_type = 'new_business'
+//     pipeline  → HS_NEW_BUSINESS_PIPELINE_ID
+//     stage     → HS_STAGE_NB_QUALIFICATION_ID   (Discovery → Qualification)
+//
+//   deal_type = 'renewal' (default)
+//     pipeline  → HS_RENEWAL_PIPELINE_ID
+//     stage     → HS_STAGE_WAITING_FOR_PROPOSAL_ID (Request Information → Waiting for Proposal)
+//
+// Env vars:
+//   HUBSPOT_PRIVATE_APP_TOKEN
+//   HS_RENEWAL_PIPELINE_ID
+//   HS_STAGE_WAITING_FOR_PROPOSAL_ID
+//   HS_NEW_BUSINESS_PIPELINE_ID
+//   HS_STAGE_NB_QUALIFICATION_ID
+
+export const runtime = "nodejs";
 
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin";
 
-const HS_TOKEN      = process.env.HUBSPOT_PRIVATE_APP_TOKEN || "";
-const PIPELINE_ID   = process.env.HS_RENEWAL_PIPELINE_ID    || "";
-const STAGE_WAITING = process.env.HS_STAGE_WAITING_FOR_PROPOSAL_ID || "";
+const HS_TOKEN          = process.env.HUBSPOT_PRIVATE_APP_TOKEN          || "";
+// Renewal
+const R_PIPELINE        = process.env.HS_RENEWAL_PIPELINE_ID             || "";
+const R_STAGE_WAITING   = process.env.HS_STAGE_WAITING_FOR_PROPOSAL_ID   || "";
+// New Business
+const NB_PIPELINE       = process.env.HS_NEW_BUSINESS_PIPELINE_ID        || "";
+const NB_STAGE_QUAL     = process.env.HS_STAGE_NB_QUALIFICATION_ID       || "";
+
+/* ---------- tiny helpers ---------- */
 
 async function insertLog(
   supabase: ReturnType<typeof getSupabaseAdmin>,
@@ -13,11 +39,9 @@ async function insertLog(
   action: string,
   details: any = null
 ) {
-  await supabase.from("form_hubspot_sync_logs").insert({
-    form_instance_id,
-    action,
-    details
-  });
+  await supabase
+    .from("form_hubspot_sync_logs")
+    .insert({ form_instance_id, action, details });
 }
 
 async function updateForm(
@@ -25,25 +49,30 @@ async function updateForm(
   form_instance_id: string,
   patch: Record<string, any>
 ) {
-  await supabase.from("form_instances").update(patch).eq("id", form_instance_id);
+  await supabase
+    .from("form_instances")
+    .update(patch)
+    .eq("id", form_instance_id);
 }
+
+/* ---------- POST ---------- */
 
 export async function POST(req: NextRequest) {
   const debug: any = { steps: [] };
 
   try {
     const supabase = getSupabaseAdmin();
-    // 0) Basic env presence check (masked booleans – no secrets leaked)
+
     debug.env = {
-      SUPABASE_URL: !!process.env.SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      HUBSPOT_PRIVATE_APP_TOKEN_present: HS_TOKEN.length > 10,
-      HS_RENEWAL_PIPELINE_ID_present: !!PIPELINE_ID,
-      HS_STAGE_WAITING_present: !!STAGE_WAITING
+      HUBSPOT_PRIVATE_APP_TOKEN_present : HS_TOKEN.length > 10,
+      HS_RENEWAL_PIPELINE_ID_present    : !!R_PIPELINE,
+      HS_STAGE_WAITING_present          : !!R_STAGE_WAITING,
+      HS_NEW_BUSINESS_PIPELINE_present  : !!NB_PIPELINE,
+      HS_STAGE_NB_QUAL_present          : !!NB_STAGE_QUAL,
     };
 
     const body = await req.json().catch(() => ({} as any));
-    const form_instance_id = body?.form_instance_id as string;
+    const form_instance_id  = body?.form_instance_id as string;
     const submitted_by_email = (body?.submitted_by_email || "").toLowerCase();
 
     debug.steps.push("BODY_PARSED");
@@ -52,11 +81,13 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ ok: false, debug }), { status: 400 });
     }
 
-    // 1) Mark STARTED so we never stay in NOT_ATTEMPTED silently
-    await updateForm(supabase, form_instance_id, { hubspot_sync_status: "STARTED" }).catch(() => {});
+    /* 1. Mark STARTED */
+    await updateForm(supabase, form_instance_id, {
+      hubspot_sync_status: "STARTED",
+    }).catch(() => {});
     debug.steps.push("STATUS_STARTED");
 
-    // 2) Load the form row
+    /* 2. Load form row */
     const { data: form, error } = await supabase
       .from("form_instances")
       .select("*")
@@ -65,86 +96,135 @@ export async function POST(req: NextRequest) {
 
     if (error || !form) {
       debug.steps.push("FORM_NOT_FOUND");
-      await insertLog(supabase, form_instance_id, "FORM_NOT_FOUND", { error: String(error?.message || error) }).catch(() => {});
-      // We can’t update a row that doesn't exist; return debug only.
-      return new Response(JSON.stringify({ ok: true, hubspotUpdated: false, reason: "form_not_found", debug }), { status: 200 });
+      await insertLog(supabase, form_instance_id, "FORM_NOT_FOUND", {
+        error: String(error?.message || error),
+      }).catch(() => {});
+      return new Response(
+        JSON.stringify({ ok: true, hubspotUpdated: false, reason: "form_not_found", debug }),
+        { status: 200 }
+      );
     }
 
-    await insertLog(supabase, form_instance_id, "FORM_LOADED", { hasDealId: !!form.hubspot_deal_id }).catch(() => {});
+    await insertLog(supabase, form_instance_id, "FORM_LOADED", {
+      hasDealId : !!form.hubspot_deal_id,
+      dealType  : form.deal_type || "renewal",
+    }).catch(() => {});
     debug.steps.push("FORM_LOADED");
 
-    // 3) If there is no deal id, flag and exit (non-blocking)
+    /* 3. Guard: deal ID required */
     const dealId = form.hubspot_deal_id?.toString().trim();
     if (!dealId) {
       await updateForm(supabase, form_instance_id, {
-        hubspot_sync_status: "MISSING_DEAL_ID",
-        hubspot_sync_error: "No hubspot_deal_id on form instance",
-        needs_attention: true,
-        submitted_by_email: submitted_by_email || form.submitted_by_email || null
+        hubspot_sync_status : "MISSING_DEAL_ID",
+        hubspot_sync_error  : "No hubspot_deal_id on form instance",
+        needs_attention     : true,
+        submitted_by_email  : submitted_by_email || form.submitted_by_email || null,
       }).catch(() => {});
       await insertLog(supabase, form_instance_id, "MISSING_DEAL_ID_FLAGGED", null).catch(() => {});
       debug.steps.push("MISSING_DEAL_ID_FLAGGED");
-      return new Response(JSON.stringify({ ok: true, hubspotUpdated: false, reason: "missing_deal_id", debug }), { status: 200 });
+      return new Response(
+        JSON.stringify({ ok: true, hubspotUpdated: false, reason: "missing_deal_id", debug }),
+        { status: 200 }
+      );
     }
 
-    // 4) We are ABOUT to call HubSpot — breadcrumb
+    /* 4. Resolve pipeline + stage based on deal type */
+    const dealType  = (form.deal_type || "renewal") as string;
+    const isNewBiz  = dealType === "new_business";
+    const pipeline  = isNewBiz ? NB_PIPELINE   : R_PIPELINE;
+    const stage     = isNewBiz ? NB_STAGE_QUAL : R_STAGE_WAITING;
+
+    debug.dealType = dealType;
+    debug.pipeline = pipeline;
+    debug.stage    = stage;
+
+    /* 5. Env-var guard for HubSpot call */
+    if (!HS_TOKEN || !pipeline || !stage) {
+      debug.steps.push("ENV_MISSING_FOR_HS_CALL");
+      await updateForm(supabase, form_instance_id, {
+        hubspot_sync_status : "FAILED_UPDATE",
+        hubspot_sync_error  : `Missing HS env for deal_type=${dealType} (token/pipeline/stage)`,
+        needs_attention     : true,
+      }).catch(() => {});
+      await insertLog(supabase, form_instance_id, "HUBSPOT_UPDATE_FAILED", {
+        reason: "env_missing",
+        dealType,
+      }).catch(() => {});
+      return new Response(
+        JSON.stringify({ ok: true, hubspotUpdated: false, debug }),
+        { status: 200 }
+      );
+    }
+
+    /* 6. Breadcrumb before HubSpot call */
     await insertLog(supabase, form_instance_id, "ABOUT_TO_CALL_HUBSPOT", {
-      dealId, pipeline: PIPELINE_ID, stage: STAGE_WAITING
+      dealId,
+      pipeline,
+      stage,
+      dealType,
     }).catch(() => {});
     debug.steps.push("ABOUT_TO_CALL_HUBSPOT");
 
-    // 5) Call HubSpot to move the deal
-    if (!HS_TOKEN || !PIPELINE_ID || !STAGE_WAITING) {
-      debug.steps.push("ENV_MISSING_FOR_HS_CALL");
-      await updateForm(supabase, form_instance_id, {
-        hubspot_sync_status: "FAILED_UPDATE",
-        hubspot_sync_error: "Missing HS env (token/pipeline/stage)",
-        needs_attention: true
-      }).catch(() => {});
-      await insertLog(supabase, form_instance_id, "HUBSPOT_UPDATE_FAILED", { reason: "env_missing" }).catch(() => {});
-      return new Response(JSON.stringify({ ok: true, hubspotUpdated: false, debug }), { status: 200 });
-    }
-
-    const hsRes = await fetch(`https://api.hubapi.com/crm/v3/objects/deals/${dealId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${HS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        properties: {
-          dealstage: STAGE_WAITING,
-          pipeline: PIPELINE_ID
-        }
-      })
-    });
+    /* 7. Move the deal to the target stage */
+    const hsRes = await fetch(
+      `https://api.hubapi.com/crm/v3/objects/deals/${dealId}`,
+      {
+        method  : "PATCH",
+        headers : {
+          Authorization  : `Bearer ${HS_TOKEN}`,
+          "Content-Type" : "application/json",
+        },
+        body: JSON.stringify({
+          properties: { dealstage: stage, pipeline },
+        }),
+      }
+    );
 
     debug.steps.push(`HS_RESPONSE_${hsRes.status}`);
 
     if (!hsRes.ok) {
       const text = await hsRes.text();
       await updateForm(supabase, form_instance_id, {
-        hubspot_sync_status: "FAILED_UPDATE",
-        hubspot_sync_error: `HTTP ${hsRes.status}: ${text?.slice(0,800)}`,
-        needs_attention: true
+        hubspot_sync_status : "FAILED_UPDATE",
+        hubspot_sync_error  : `HTTP ${hsRes.status}: ${text?.slice(0, 800)}`,
+        needs_attention     : true,
       }).catch(() => {});
-      await insertLog(supabase, form_instance_id, "HUBSPOT_UPDATE_FAILED", { status: hsRes.status, body: text?.slice(0,2000) }).catch(() => {});
-      return new Response(JSON.stringify({ ok: true, hubspotUpdated: false, debug }), { status: 200 });
+      await insertLog(supabase, form_instance_id, "HUBSPOT_UPDATE_FAILED", {
+        status : hsRes.status,
+        body   : text?.slice(0, 2000),
+        dealType,
+      }).catch(() => {});
+      return new Response(
+        JSON.stringify({ ok: true, hubspotUpdated: false, debug }),
+        { status: 200 }
+      );
     }
 
+    /* 8. Success */
     await updateForm(supabase, form_instance_id, {
-      hubspot_sync_status: "SUCCESS",
-      hubspot_sync_error: null,
-      needs_attention: false
+      hubspot_sync_status : "SUCCESS",
+      hubspot_sync_error  : null,
+      needs_attention     : false,
+      submitted_by_email  : submitted_by_email || form.submitted_by_email || null,
     }).catch(() => {});
-    await insertLog(supabase, form_instance_id, "HUBSPOT_UPDATE_SUCCESS", { dealId }).catch(() => {});
+    await insertLog(supabase, form_instance_id, "HUBSPOT_UPDATE_SUCCESS", {
+      dealId,
+      dealType,
+      pipeline,
+      stage,
+    }).catch(() => {});
     debug.steps.push("HUBSPOT_UPDATE_SUCCESS");
 
-    return new Response(JSON.stringify({ ok: true, hubspotUpdated: true, debug }), { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, hubspotUpdated: true, debug }),
+      { status: 200 }
+    );
   } catch (err: any) {
-    // Final safety net
     debug.steps.push("HANDLER_EXCEPTION");
     debug.error = String(err?.message || err);
-    return new Response(JSON.stringify({ ok: true, hubspotUpdated: false, debug }), { status: 200 });
+    return new Response(
+      JSON.stringify({ ok: true, hubspotUpdated: false, debug }),
+      { status: 200 }
+    );
   }
 }
