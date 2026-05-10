@@ -222,6 +222,8 @@ function TemplatesModule({
   const [sendingEmail, setSendingEmail]          = useState(false);
   const [emailSent, setEmailSent]                = useState(false);
 
+  const [senderEmail, setSenderEmail] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
@@ -431,6 +433,7 @@ function TemplatesModule({
         headers : { "content-type": "application/json" },
         body    : JSON.stringify({
           adminSecret,
+          fromEmail   : senderEmail,
           toEmail     : contactEmail,
           lang,
           dynamicData : {
@@ -651,6 +654,33 @@ function TemplatesModule({
                     />
                   </div>
 
+                  {/* Sender email (account manager) */}
+                  <div>
+                    <Label htmlFor="sender-email" className="text-slate-700 font-medium">
+                      Seu email (remetente)
+                    </Label>
+                    <Input
+                      id="sender-email"
+                      type="email"
+                      value={senderEmail}
+                      onChange={(e) => setSenderEmail(e.target.value.trim())}
+                      placeholder="seunome@covercap.co"
+                      className={`mt-2 ${
+                        senderEmail && !senderEmail.toLowerCase().endsWith("@covercap.co")
+                          ? "border-red-400 focus-visible:ring-red-400"
+                          : ""
+                      }`}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      O cliente receberá o email enviado por você. Deve ser um endereço <strong>@covercap.co</strong>.
+                    </p>
+                    {senderEmail && !senderEmail.toLowerCase().endsWith("@covercap.co") && (
+                      <p className="text-xs text-red-500 mt-1">
+                        Use um endereço @covercap.co (ex: seunome@covercap.co)
+                      </p>
+                    )}
+                  </div>
+
                   {/* Contact info */}
                   <div>
                     <Label className="text-slate-700 font-medium mb-3 block">
@@ -794,6 +824,14 @@ function TemplatesModule({
                   </Button>
                   <Button
                     onClick={() => {
+                      if (!senderEmail || !senderEmail.toLowerCase().endsWith("@covercap.co")) {
+                        toast({
+                          title       : "Seu email é obrigatório",
+                          description : "Preencha seu email @covercap.co no campo 'Seu email (remetente)'.",
+                          variant     : "destructive",
+                        });
+                        return;
+                      }
                       if (!contactEmail) {
                         toast({
                           title       : "Email do contato ausente",
@@ -922,6 +960,10 @@ function TemplatesModule({
                 {/* Body */}
                 <div className="p-5 space-y-3 text-sm text-slate-700">
                   <div className="rounded-lg bg-slate-50 border border-slate-200 divide-y divide-slate-200">
+                    <div className="flex gap-3 px-4 py-3">
+                      <span className="w-20 shrink-0 font-medium text-slate-500">De:</span>
+                      <span className="break-all">{senderEmail}</span>
+                    </div>
                     <div className="flex gap-3 px-4 py-3">
                       <span className="w-20 shrink-0 font-medium text-slate-500">Para:</span>
                       <span className="break-all">{contactEmail}</span>

@@ -1,10 +1,11 @@
 // app/api/admin/send-form-email/route.ts
 //
 // Sends the form URL to the client's contact email via SendGrid Dynamic Templates.
+// The sender (From + Reply-To) is the account manager's own @covercap.co address,
+// supplied by the admin UI and validated server-side.
 //
 // Env vars required:
-//   SENDGRID_API_KEY            — SendGrid private API key
-//   SENDGRID_FROM_EMAIL         — Verified sender email (e.g. contato@forters.com.br)
+//   SENDGRID_API_KEY            — SendGrid private API key (domain covercap.co must be authenticated)
 //   SENDGRID_TEMPLATE_ID_PTBR   — Template ID for PT-BR email
 //   SENDGRID_TEMPLATE_ID_ES     — Template ID for ES/EN email
 //
@@ -17,21 +18,24 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SG_KEY         = process.env.SENDGRID_API_KEY             || "";
-const SG_FROM        = process.env.SENDGRID_FROM_EMAIL          || "";
-const TPL_PTBR       = process.env.SENDGRID_TEMPLATE_ID_PTBR    || "";
-const TPL_ES         = process.env.SENDGRID_TEMPLATE_ID_ES       || "";
+const SG_KEY   = process.env.SENDGRID_API_KEY          || "";
+const TPL_PTBR = process.env.SENDGRID_TEMPLATE_ID_PTBR || "";
+const TPL_ES   = process.env.SENDGRID_TEMPLATE_ID_ES   || "";
+
+const ALLOWED_DOMAIN = "covercap.co";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({} as any));
     const {
       adminSecret,
+      fromEmail,
       toEmail,
       lang,
       dynamicData,
     } = body as {
       adminSecret  : string;
+      fromEmail    : string;   // must end with @covercap.co
       toEmail      : string;
       lang         : string;   // 'pt-BR' | 'es' | 'en'
       dynamicData  : {
@@ -46,6 +50,19 @@ export async function POST(req: Request) {
     if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+
+    /* ── validate fromEmail domain ── */
+    if (!fromEmail) {
+      return NextResponse.json({ error: "fromEmail is required" }, { status: 400 });
+    }
+    const fromDomain = fromEmail.split("@")[1]?.toLowerCase();
+    if (fromDomain !== ALLOWED_DOMAIN) {
+      return NextResponse.json(
+        { error: `fromEmail must be a @${ALLOWED_DOMAIN} address` },
+        { status: 400 }
+      );
+    }
+
     if (!toEmail) {
       return NextResponse.json({ error: "toEmail is required" }, { status: 400 });
     }
@@ -56,9 +73,6 @@ export async function POST(req: Request) {
     /* ── env var check ── */
     if (!SG_KEY) {
       return NextResponse.json({ error: "SENDGRID_API_KEY not configured" }, { status: 500 });
-    }
-    if (!SG_FROM) {
-      return NextResponse.json({ error: "SENDGRID_FROM_EMAIL not configured" }, { status: 500 });
     }
 
     /* ── pick template based on language ── */
@@ -79,12 +93,13 @@ export async function POST(req: Request) {
         "Content-Type" : "application/json",
       },
       body: JSON.stringify({
-        from             : { email: SG_FROM },
+        from             : { email: fromEmail },
+        reply_to         : { email: fromEmail },
         template_id      : templateId,
         personalizations : [
           {
-            to                   : [{ email: toEmail }],
-            dynamic_template_data: {
+            to                    : [{ email: toEmail }],
+            dynamic_template_data : {
               contact_name : dynamicData.contact_name || "",
               company_name : dynamicData.company_name || "",
               product_name : dynamicData.product_name || "",
