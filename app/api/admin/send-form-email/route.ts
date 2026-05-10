@@ -4,25 +4,57 @@
 // The sender (From + Reply-To) is the account manager's own @covercap.co address,
 // supplied by the admin UI and validated server-side.
 //
+// After a successful send, creates a Note on the HubSpot deal (non-fatal).
+//
 // Env vars required:
 //   SENDGRID_API_KEY            — SendGrid private API key (domain covercap.co must be authenticated)
 //   SENDGRID_TEMPLATE_ID_PTBR   — Template ID for PT-BR email
 //   SENDGRID_TEMPLATE_ID_ES     — Template ID for ES/EN email
-//
-// Language → template mapping:
-//   pt-BR → SENDGRID_TEMPLATE_ID_PTBR
-//   es | en → SENDGRID_TEMPLATE_ID_ES
+//   HUBSPOT_PRIVATE_APP_TOKEN   — For posting the note to the deal
 
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SG_KEY   = process.env.SENDGRID_API_KEY          || "";
-const TPL_PTBR = process.env.SENDGRID_TEMPLATE_ID_PTBR || "";
-const TPL_ES   = process.env.SENDGRID_TEMPLATE_ID_ES   || "";
+const SG_KEY   = process.env.SENDGRID_API_KEY             || "";
+const TPL_PTBR = process.env.SENDGRID_TEMPLATE_ID_PTBR    || "";
+const TPL_ES   = process.env.SENDGRID_TEMPLATE_ID_ES       || "";
+const HS_TOKEN = process.env.HUBSPOT_PRIVATE_APP_TOKEN     || "";
 
 const ALLOWED_DOMAIN = "covercap.co";
+
+/* ---------- HubSpot note helper ---------- */
+
+async function postHubSpotNote(dealId: string, noteBody: string) {
+  await fetch("https://api.hubapi.com/crm/v3/objects/notes", {
+    method  : "POST",
+    headers : {
+      Authorization  : `Bearer ${HS_TOKEN}`,
+      "Content-Type" : "application/json",
+    },
+    body: JSON.stringify({
+      properties: {
+        hs_note_body : noteBody,
+        hs_timestamp : new Date().toISOString(),
+      },
+      associations: [
+        {
+          to    : { id: dealId },
+          types : [
+            {
+              associationCategory : "HUBSPOT_DEFINED",
+              associationTypeId   : 214, // note → deal
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  // fire-and-forget — errors are intentionally swallowed so email success is not affected
+}
+
+/* ---------- POST handler ---------- */
 
 export async function POST(req: Request) {
   try {
@@ -31,12 +63,14 @@ export async function POST(req: Request) {
       adminSecret,
       fromEmail,
       toEmail,
+      dealId,
       lang,
       dynamicData,
     } = body as {
       adminSecret  : string;
       fromEmail    : string;   // must end with @covercap.co
       toEmail      : string;
+      dealId?      : string;   // optional — if provided, a note is added to the deal
       lang         : string;   // 'pt-BR' | 'es' | 'en'
       dynamicData  : {
         contact_name : string;
@@ -112,6 +146,26 @@ export async function POST(req: Request) {
 
     // SendGrid returns 202 with empty body on success
     if (sgRes.status === 202) {
+      /* ── post note to HubSpot deal (non-fatal, fire-and-forget) ── */
+      if (dealId && HS_TOKEN) {
+        const sentAt = new Date().toLocaleString("pt-BR", {
+          day   : "2-digit",
+          month : "2-digit",
+          year  : "numeric",
+          hour  : "2-digit",
+          minute: "2-digit",
+        });
+        const noteLines = [
+          `📧 Email do questionário enviado ao cliente`,
+          ``,
+          `Para: ${toEmail}`,
+          `Por: ${fromEmail}`,
+          `Link: ${dynamicData.form_url}`,
+          `Enviado em: ${sentAt}`,
+        ];
+        postHubSpotNote(dealId, noteLines.join("\n")).catch(() => {});
+      }
+
       return NextResponse.json({ ok: true });
     }
 

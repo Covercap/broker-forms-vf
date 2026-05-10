@@ -435,6 +435,7 @@ function TemplatesModule({
           adminSecret,
           fromEmail   : senderEmail,
           toEmail     : contactEmail,
+          dealId      : hsDealId || renewalDealId || undefined,
           lang,
           dynamicData : {
             contact_name : contactName || "",
