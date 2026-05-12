@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Upload, FileText } from "lucide-react"
+import { Plus, Upload, FileText, Trash2 } from "lucide-react"
 
 /* =========================
    Types
@@ -358,23 +358,67 @@ export function QuestionRenderer({
 
   const renderCurrencyQuestion = () => {
     const decimals = question.config?.decimals ?? 2
-    const currency = question.config?.currency ?? "BRL"
-    const cents = question.answer?.amount_cents ?? null
-    const display = cents != null ? (cents / 100).toFixed(decimals) : ""
+    const hasSelector = !!(question.config as any)?.currencySelector
+    const availableCurrencies: string[] = (question.config as any)?.currencies ?? ["BRL"]
+    const CURRENCY_SYMBOLS: Record<string, string> = {
+      BRL: "R$", USD: "US$", COP: "COP$", MXN: "MX$", ARS: "AR$",
+    }
+
+    // Currency comes from the answer (dynamic) or config (static)
+    const activeCurrency: string = question.answer?.currency ?? (question.config as any)?.currency ?? "BRL"
+    const cents: number | null = question.answer?.amount_cents ?? null
+
+    // Format for display using pt-BR locale: 1.000.000,00
+    const formatDisplay = (c: number | null) => {
+      if (c == null) return ""
+      return (c / 100).toLocaleString("pt-BR", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })
+    }
+
+    const handleAmountChange = (raw: string) => {
+      // Strip thousand separators (.) and replace decimal separator (,) with (.)
+      const clean = raw.replace(/\./g, "").replace(",", ".")
+      const num = Number.isFinite(Number(clean)) ? Number(clean) : 0
+      onAnswerChange(question.code, {
+        amount_cents : Math.round(num * 10 ** decimals),
+        currency     : activeCurrency,
+      })
+    }
+
+    const handleCurrencyChange = (newCurrency: string) => {
+      onAnswerChange(question.code, {
+        amount_cents : cents ?? 0,
+        currency     : newCurrency,
+      })
+    }
 
     return (
       <CardContent>
         <div className="flex items-center gap-2">
-          <span className="text-slate-600 font-medium">{currency === "BRL" ? "R$" : currency}</span>
+          {hasSelector ? (
+            <Select value={activeCurrency} onValueChange={handleCurrencyChange} disabled={locked}>
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCurrencies.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {CURRENCY_SYMBOLS[c] ?? c} {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="text-slate-600 font-medium">
+              {CURRENCY_SYMBOLS[activeCurrency] ?? activeCurrency}
+            </span>
+          )}
           <Input
-            value={display}
-            onChange={(e) => {
-              const clean = e.target.value.replace(/\./g, "").replace(",", ".")
-              const num = Number.isFinite(Number(clean)) ? Number(clean) : 0
-              const next = { amount_cents: Math.round(num * 10 ** decimals), currency }
-              onAnswerChange(question.code, next)
-            }}
-            placeholder={(0).toFixed(decimals)}
+            value={formatDisplay(cents)}
+            onChange={(e) => handleAmountChange(e.target.value)}
+            placeholder={formatDisplay(0)}
             disabled={locked}
             className="flex-1"
           />
@@ -383,7 +427,22 @@ export function QuestionRenderer({
     )
   }
 
-  /* ========= Attachments ========= */
+  /* ========= Attachments (multi-file) ========= */
+
+  type FileMetadata = {
+    bucket      : string
+    objectKey   : string
+    filename    : string
+    size        : number
+    contentType : string
+  }
+
+  // Normalise answer to array — backwards-compatible with legacy single-object answers
+  const existingFiles: FileMetadata[] = Array.isArray(question.answer)
+    ? question.answer
+    : question.answer?.filename
+    ? [question.answer as FileMetadata]
+    : []
 
   const renderAttachmentQuestion = () => {
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -394,56 +453,54 @@ export function QuestionRenderer({
       setUploadError(null)
 
       try {
+        // Step 1 — get signed upload URL
         const response = await fetch("/api/upload", {
-          method: "POST",
+          method : "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
+          body   : JSON.stringify({
             token,
             questionCode: question.code,
-            fileName: file.name,
-            contentType: file.type || "application/octet-stream",
+            fileName    : file.name,
+            contentType : file.type || "application/octet-stream",
           }),
         })
-
         const result = await response.json()
         if (!response.ok) throw new Error(result.error || "Falha ao criar URL de upload")
 
+        // Step 2 — PUT directly to Supabase Storage
         const uploadResponse = await fetch(result.uploadUrl, {
-  method: "PUT",
-  headers: { "content-type": result.contentType },
-  body: file,
-})
+          method : "PUT",
+          headers: { "content-type": result.contentType },
+          body   : file,
+        })
+        if (!uploadResponse.ok) throw new Error("Falha no upload")
 
-if (!uploadResponse.ok) throw new Error("Falha no upload")
+        // Step 3 — record in form_files table
+        const recordResponse = await fetch("/api/upload/record", {
+          method : "POST",
+          headers: { "content-type": "application/json" },
+          body   : JSON.stringify({
+            token,
+            questionCode: question.code,
+            objectKey   : result.objectKey,
+            fileName    : file.name,
+            size        : file.size,
+          }),
+        })
+        const recordResult = await recordResponse.json().catch(() => ({}))
+        if (!recordResponse.ok) {
+          throw new Error(recordResult.error || "Falha ao registrar anexo no banco")
+        }
 
-// ✅ NEW STEP: record attachment in DB (THIS IS THE MISSING LINK)
-const recordResponse = await fetch("/api/upload/record", {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({
-    token,
-    questionCode: question.code,
-    objectKey: result.objectKey,
-    fileName: file.name,
-    size: file.size,
-  }),
-})
-
-const recordResult = await recordResponse.json().catch(() => ({}))
-if (!recordResponse.ok) {
-  throw new Error(recordResult.error || "Falha ao registrar anexo no banco")
-}
-
-// existing behavior (keep this)
-const metadata = {
-  bucket: result.bucket,
-  objectKey: result.objectKey,
-  filename: file.name,
-  size: file.size,
-  contentType: file.type || "application/octet-stream",
-}
-
-        onAnswerChange(question.code, metadata)
+        // Step 4 — append to answer array
+        const newFile: FileMetadata = {
+          bucket     : result.bucket,
+          objectKey  : result.objectKey,
+          filename   : file.name,
+          size       : file.size,
+          contentType: file.type || "application/octet-stream",
+        }
+        onAnswerChange(question.code, [...existingFiles, newFile])
       } catch (error: any) {
         setUploadError(error.message)
       } finally {
@@ -452,26 +509,71 @@ const metadata = {
       }
     }
 
+    const handleRemove = async (objectKey: string) => {
+      if (!token) return
+      // Optimistic UI — remove immediately
+      const updated = existingFiles.filter((f) => f.objectKey !== objectKey)
+      onAnswerChange(question.code, updated)
+
+      // Best-effort server delete (non-fatal)
+      await fetch("/api/upload/remove", {
+        method : "POST",
+        headers: { "content-type": "application/json" },
+        body   : JSON.stringify({ token, objectKey }),
+      }).catch(() => {})
+    }
+
+    const formatSize = (bytes: number) => {
+      if (bytes < 1024) return `${bytes} B`
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    }
+
     return (
       <CardContent>
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              disabled={locked || uploadBusy}
-              className="flex items-center gap-2 bg-transparent"
-              onClick={() => document.getElementById(`file-${question.code}`)?.click()}
+        <div className="space-y-3">
+          {/* Uploaded files list */}
+          {existingFiles.map((f) => (
+            <div
+              key={f.objectKey}
+              className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg"
             >
-              <Upload className="h-4 w-4" />
-              {uploadBusy ? "Enviando..." : "File"}
-            </Button>
-            <input id={`file-${question.code}`} type="file" onChange={handleFileSelect} className="hidden" disabled={locked || uploadBusy} />
-          </div>
+              <FileText className="h-4 w-4 text-green-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-green-800 truncate">{f.filename}</p>
+                <p className="text-xs text-green-600">{formatSize(f.size)}</p>
+              </div>
+              {!locked && (
+                <button
+                  onClick={() => handleRemove(f.objectKey)}
+                  className="text-red-400 hover:text-red-600 transition-colors shrink-0"
+                  title="Remover arquivo"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ))}
 
-          {question.answer?.filename && (
-            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <FileText className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800">Arquivo enviado: {question.answer.filename}</span>
+          {/* Upload button — always visible */}
+          {!locked && (
+            <div>
+              <Button
+                variant="outline"
+                disabled={uploadBusy}
+                className="flex items-center gap-2 bg-transparent"
+                onClick={() => document.getElementById(`file-${question.code}`)?.click()}
+              >
+                <Upload className="h-4 w-4" />
+                {uploadBusy ? "Enviando..." : existingFiles.length > 0 ? "Adicionar arquivo" : "File"}
+              </Button>
+              <input
+                id={`file-${question.code}`}
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                disabled={uploadBusy}
+              />
             </div>
           )}
 
