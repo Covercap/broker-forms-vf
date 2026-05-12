@@ -42,14 +42,14 @@ const TEXT = {
 
   es: {
     title: "¡Gracias por enviar el cuestionario!",
-    desc: "Tu cotización está en proceso. Este proceso puede tardar hasta 15 días. Nos pondremos en contacto contigo cuando tengamos las propuestas de seguro.",
+    desc: "Tu cotización está en proceso. Esto puede tardar hasta 15 días. Nos pondremos en contacto contigo cuando tengamos las propuestas de seguros.",
     stepsTitle: "Próximos pasos",
     s1Title: "Completar los datos",
     s1Desc: "Completa el formulario y envía los documentos.",
     s2Title: "Cotización",
     s2Sub: "(estás aquí)",
     s2Desc:
-      "Buscaremos junto a las aseguradoras asociadas la mejor opción de cobertura para tu empresa.",
+      "Buscaremos junto a las aseguradoras aliadas la mejor opción de cobertura para tu empresa.",
     s3Title: "Aprobación de coberturas y condiciones",
     s3Desc: "Elegirás la propuesta que mejor se adapte a tus necesidades.",
     s4Title: "Renovación de la póliza",
@@ -175,7 +175,7 @@ export default function SuccessPage({
 
         <footer className="mt-8 text-center">
           <a
-            href="https://www.forters.com.br"
+            href="https://www.covercap.co"
             target="_blank"
             rel="noreferrer"
             className="text-slate-300 underline"
