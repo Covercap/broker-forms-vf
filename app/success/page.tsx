@@ -92,11 +92,11 @@ export default function SuccessPage({
       <header className="bg-white w-full">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-center">
           <Image
-            src="/covercap-logo-white.png"
+            src="/covercap-logo.png"
             alt="CoverCap"
-            width={180}
-            height={70}
-            className="h-14"
+            width={240}
+            height={80}
+            className="h-16"
           />
         </div>
       </header>
