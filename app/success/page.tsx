@@ -94,9 +94,9 @@ export default function SuccessPage({
           <Image
             src="/covercap-logo.png"
             alt="CoverCap"
-            width={240}
+            width={220}
             height={80}
-            className="h-16"
+            className="h-14"
           />
         </div>
       </header>
