@@ -13,7 +13,7 @@ const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 10 },
 
   headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  logo: { width: 120, height: 48, marginRight: 16 },
+  logo: { width: 160, height: 54, marginRight: 16 },
 
   title: { fontSize: 18, marginBottom: 4 },
   small: { fontSize: 9, color: "#444" },

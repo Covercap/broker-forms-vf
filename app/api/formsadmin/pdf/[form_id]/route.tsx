@@ -314,9 +314,9 @@ const attachments: { filename: string }[] = (filesDb || []).map((f) => ({
     // 8) Logo
     let logoDataUrl = "";
     try {
-      const logoPath = path.join(process.cwd(), "public", "forters-logo.jpeg");
+      const logoPath = path.join(process.cwd(), "public", "covercap-logo.png");
       const bytes = await fs.readFile(logoPath);
-      logoDataUrl = `data:image/jpeg;base64,${bytes.toString("base64")}`;
+      logoDataUrl = `data:image/png;base64,${bytes.toString("base64")}`;
     } catch {}
 
     // 9) Broker info
