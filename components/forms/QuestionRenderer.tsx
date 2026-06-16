@@ -172,8 +172,6 @@ export function QuestionRenderer({
 }: QuestionRendererProps) {
   const [uploadBusy, setUploadBusy] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [currencyRawText, setCurrencyRawText] = useState<string>("")
-  const [currencyEditing, setCurrencyEditing] = useState<boolean>(false)
 
   // language from ?lang= in the URL (pt-BR / en / es)
   const searchParams = useSearchParams()
@@ -418,16 +416,10 @@ export function QuestionRenderer({
             </span>
           )}
           <Input
-            value={currencyEditing ? currencyRawText : formatDisplay(cents)}
-            onFocus={() => {
-              setCurrencyEditing(true)
-              setCurrencyRawText(formatDisplay(cents))
-            }}
-            onChange={(e) => setCurrencyRawText(e.target.value)}
-            onBlur={(e) => {
-              setCurrencyEditing(false)
-              handleAmountChange(e.target.value)
-            }}
+            key={`curr-${question.code}-${cents}`}
+            defaultValue={formatDisplay(cents)}
+            onFocus={(e) => e.target.select()}
+            onBlur={(e) => handleAmountChange(e.target.value)}
             placeholder="0,00"
             disabled={locked}
             className="flex-1"
